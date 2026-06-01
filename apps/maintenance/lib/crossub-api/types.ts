@@ -87,9 +87,22 @@ export interface ApiMaintenanceNotification {
 }
 
 export interface ApiMaintenanceState {
-  requests: ApiMaintenanceRequest[];
+  maintenanceRequests: ApiMaintenanceRequest[];
   contractors: ApiContractor[];
   quotations: ApiQuotation[];
-  auditLog: ApiMaintenanceAuditLogEntry[];
-  notifications: ApiMaintenanceNotification[];
+  maintenanceAuditLog: ApiMaintenanceAuditLogEntry[];
+  maintenanceNotifications: ApiMaintenanceNotification[];
+  maintenanceReminders?: {
+    id: string;
+    maintenanceRequestId: string;
+    type: 'reminder' | 'escalation';
+    dueAt: string;
+  }[];
+  maintenanceAttachments?: {
+    id: string;
+    maintenanceRequestId: string;
+    kind: string;
+    fileName: string;
+  }[];
+  lastMaintenanceError?: string | null;
 }

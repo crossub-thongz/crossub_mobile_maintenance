@@ -14,7 +14,8 @@ import type {
 } from '@/lib/types';
 import { jobDetail } from '@/constants/routes';
 
-const CONTRACTOR_ID = 'contractor-demo-1';
+/** Matches crossub_web seed contractor (Apex Flow Solutions) for API-assigned jobs */
+const CONTRACTOR_ID = 'c1';
 
 function auditToTimeline(entries: ApiMaintenanceAuditLogEntry[]): TimelineEntry[] {
   return entries.map((e) => ({
@@ -165,14 +166,19 @@ export function mapApiJob(
 }
 
 export function mapAllApiJobs(state: {
-  requests: ApiMaintenanceRequest[];
+  maintenanceRequests: ApiMaintenanceRequest[];
   contractors: ApiContractor[];
   quotations: ApiQuotation[];
-  auditLog: ApiMaintenanceAuditLogEntry[];
+  maintenanceAuditLog: ApiMaintenanceAuditLogEntry[];
 }): MappedJob[] {
-  return state.requests
+  return state.maintenanceRequests
     .map((req) =>
-      mapApiJob(req, state.contractors, state.quotations, state.auditLog),
+      mapApiJob(
+        req,
+        state.contractors,
+        state.quotations,
+        state.maintenanceAuditLog,
+      ),
     )
     .filter((j): j is MappedJob => j !== null);
 }

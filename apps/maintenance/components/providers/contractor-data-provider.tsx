@@ -87,7 +87,12 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
       const state = await fetchMaintenanceState();
       const mapped = mapAllApiJobs(state);
       setJobsFromApi(mapped);
-      setApiNotifications(notificationsToContractor(state.notifications, state.requests));
+      setApiNotifications(
+        notificationsToContractor(
+          state.maintenanceNotifications,
+          state.maintenanceRequests,
+        ),
+      );
       setApiConnected(true);
       setApiError(null);
       await fetchMaintenanceKpis('contractor').catch(() => undefined);
