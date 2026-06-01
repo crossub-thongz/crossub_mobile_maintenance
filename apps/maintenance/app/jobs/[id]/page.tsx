@@ -1,0 +1,219 @@
+'use client';
+
+import Link from 'next/link';
+import { notFound, useParams } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Calendar, FileText, Phone, Upload } from 'lucide-react';
+
+import { DataSourceBadge } from '@/components/contractor/connection-banner';
+import { PriorityBadge, StatusBadge } from '@/components/contractor/status-badge';
+import { Timeline } from '@/components/contractor/timeline';
+import { ContractorShell } from '@/components/layout/contractor-shell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useContractorData } from '@/components/providers/contractor-data-provider';
+import { DECLINE_REASONS } from '@/lib/types';
+import {
+  jobComplete,
+  jobInvoice,
+  jobQuote,
+  messageDetail,
+  ROUTES,
+} from '@/constants/routes';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
+
+export default function JobDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
+  const { jobs, acceptJob, declineJob } = useContractorData();
+  const [showDecline, setShowDecline] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+
+  const job = jobs.find((j) => j.id === id);
+  if (!job) notFound();
+
+  const handleAccept = () => {
+    acceptJob(job.id);
+    toast.success('Job accepted — proceed to quote or schedule');
+  };
+
+  const handleDecline = () => {
+    if (!declineReason) {
+      toast.error('Select a decline reason');
+      return;
+    }
+    declineJob(job.id, declineReason);
+    toast.success('Job declined — returned for reassignment');
+    setShowDecline(false);
+  };
+
+  return (
+    <ContractorShell title={job.trackingNumber} backHref={ROUTES.JOBS}>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold">{job.issueSummary}</h2>
+            <p className="text-muted-foreground text-sm">{job.propertyAddress}</p>
+          </div>
+          <DataSourceBadge source={job.source} />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge status={job.status} />
+          <PriorityBadge priority={job.priority} />
+        </div>
+
+        <Card>
+          <CardContent className="space-y-3 p-4 text-sm">
+            <p>{job.description}</p>
+            <p className="text-muted-foreground text-xs">
+              Submitted {formatDateTime(job.submittedAt)}
+              {job.slaDueAt && ` · Respond by ${formatDateTime(job.slaDueAt)}`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <section className="grid grid-cols-2 gap-2 text-sm">
+          <ContactCard label="Tenant" contact={job.tenant} />
+          <ContactCard label="Agent" contact={job.agent} />
+        </section>
+
+        {job.status === 'assigned' && (
+          <div className="space-y-2">
+            {!showDecline ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="lg" onClick={handleAccept}>
+                  Accept job
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => setShowDecline(true)}>
+                  Decline
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-xl border bg-card p-4">
+                <p className="text-sm font-medium">Decline reason</p>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                >
+                  <option value="">Select reason...</option>
+                  {DECLINE_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="destructive" onClick={handleDecline}>
+                    Confirm decline
+                  </Button>
+                  <Button variant="ghost" onClick={() => setShowDecline(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(job.status === 'accepted' ||
+          job.status === 'approved' ||
+          (job.contractorResponse === 'accepted' && !job.quotation)) && (
+          <Button asChild className="w-full" size="lg">
+            <Link href={jobQuote(job.id)}>
+              <FileText className="size-4" />
+              Submit quotation
+            </Link>
+          </Button>
+        )}
+
+        {job.quotation && (
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <p className="text-sm font-semibold">Quotation</p>
+              <p className="text-primary text-xl font-bold">
+                {formatCurrency(job.quotation.totalAmount)}
+              </p>
+              <p className="text-muted-foreground text-xs">{job.quotation.scope}</p>
+              <StatusBadge status={job.quotation.status} />
+            </CardContent>
+          </Card>
+        )}
+
+        {(job.status === 'approved' || job.status === 'in_progress') && (
+          <div className="space-y-2">
+            {job.appointmentAt && (
+              <div className="flex items-center gap-2 rounded-lg bg-secondary p-3 text-sm">
+                <Calendar className="size-4 text-primary" />
+                Appointment: {formatDateTime(job.appointmentAt)}
+              </div>
+            )}
+            <Button asChild className="w-full" variant="secondary">
+              <Link href={messageDetail(`msg-${job.id.slice(-3)}`)}>
+                Contact tenant
+              </Link>
+            </Button>
+            {!job.completionEvidenceUploaded && (
+              <Button asChild className="w-full" size="lg">
+                <Link href={jobComplete(job.id)}>
+                  <Upload className="size-4" />
+                  Upload completion evidence
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+
+        {job.completionEvidenceUploaded &&
+          job.tenantConfirmed &&
+          !job.invoiceUploaded && (
+            <Button asChild className="w-full" size="lg">
+              <Link href={jobInvoice(job.id)}>Submit invoice</Link>
+            </Button>
+          )}
+
+        {job.paymentStatus && (
+          <Card>
+            <CardContent className="p-4 text-sm">
+              <p className="font-medium">Payment status</p>
+              <p className="text-muted-foreground capitalize">
+                {job.paymentStatus.replace(/_/g, ' ')}
+              </p>
+              {job.paymentReference && (
+                <p className="text-primary mt-1">{job.paymentReference}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <section>
+          <h3 className="mb-3 text-sm font-semibold">Job timeline</h3>
+          <Timeline entries={job.timeline} />
+        </section>
+      </div>
+    </ContractorShell>
+  );
+}
+
+function ContactCard({
+  label,
+  contact,
+}: {
+  label: string;
+  contact: { name: string; email?: string; phone?: string };
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-3">
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="font-medium">{contact.name}</p>
+      {contact.phone && (
+        <a href={`tel:${contact.phone}`} className="text-primary mt-1 flex items-center gap-1 text-xs">
+          <Phone className="size-3" />
+          {contact.phone}
+        </a>
+      )}
+    </div>
+  );
+}

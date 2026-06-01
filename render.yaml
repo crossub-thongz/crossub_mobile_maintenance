@@ -1,0 +1,22 @@
+# Render Blueprint — crossub_mobile_maintenance contractor app
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy: Render Dashboard → New → Blueprint → connect this repo.
+# Requires crossub_web API already deployed; set API_INTERNAL_URL after first deploy.
+
+services:
+  - type: web
+    name: crossub-mobile-maintenance
+    runtime: node
+    region: singapore
+    plan: starter
+    buildCommand: corepack enable && pnpm install && pnpm build:maintenance
+    startCommand: pnpm --filter @crossub/maintenance start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: /api
+      - key: API_INTERNAL_URL
+        sync: false
