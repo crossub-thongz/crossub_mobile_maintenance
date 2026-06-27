@@ -10,18 +10,11 @@ import {
 } from 'react';
 
 import {
-  createQuotation,
-  fetchMaintenanceKpis,
-  fetchMaintenanceState,
-  setCompletionEvidence,
-  setInvoiceUploaded,
-  uploadAttachment,
-} from '@/lib/crossub-api/maintenance-client';
-import {
-  CONTRACTOR_ID,
-  mapAllApiJobs,
-  notificationsToContractor,
-} from '@/lib/data/map-jobs';
+  acceptJob as apiAcceptJob,
+  completeJob as apiCompleteJob,
+  fetchJobs,
+} from '@/lib/crossub-api/contractor-client';
+import { mapContractorJobs } from '@/lib/crossub-api/contractor-mappers';
 import {
   applyLocalJobUpdates,
   useContractorStore,
@@ -76,31 +69,25 @@ const ContractorDataContext = createContext<ContractorDataContextValue | undefin
 export function ContractorDataProvider({ children }: { children: React.ReactNode }) {
   const store = useContractorStore();
   const [jobsFromApi, setJobsFromApi] = useState<MaintenanceJob[]>([]);
-  const [apiNotifications, setApiNotifications] = useState<ContractorNotification[]>([]);
   const [apiConnected, setApiConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Read the contractor's assigned jobs from the typed v1 facade
+  // (`GET /api/v1/contractor/jobs` — the REAL persisted MaintenanceRequest store, scoped
+  // to the signed-in contractor). On any failure we keep the demo seeds so the board
+  // never blanks; local optimistic updates (accept/quote/complete) overlay on top.
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const state = await fetchMaintenanceState();
-      const mapped = mapAllApiJobs(state);
-      setJobsFromApi(mapped);
-      setApiNotifications(
-        notificationsToContractor(
-          state.maintenanceNotifications,
-          state.maintenanceRequests,
-        ),
-      );
+      const jobs = await fetchJobs();
+      setJobsFromApi(mapContractorJobs(jobs));
       setApiConnected(true);
       setApiError(null);
-      await fetchMaintenanceKpis('contractor').catch(() => undefined);
     } catch {
       setApiConnected(false);
-      setApiError('Unable to reach crossub_web API — showing demo data');
+      setApiError('Unable to reach CROSSUB API — showing demo data');
       setJobsFromApi([]);
-      setApiNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -117,21 +104,31 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     return applyLocalJobUpdates(combined, store);
   }, [jobsFromApi, store]);
 
-  const notifications = useMemo(() => {
-    const demoIds = new Set(DEMO_NOTIFICATIONS.map((n) => n.id));
-    const apiOnly = apiNotifications.filter((n) => !demoIds.has(n.id));
-    return [...apiOnly, ...DEMO_NOTIFICATIONS].sort(
-      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
-    );
-  }, [apiNotifications]);
+  // The contractor facade exposes no notifications endpoint yet (a documented gap), so
+  // notifications stay on demo data until that facade lands.
+  const notifications = useMemo(
+    () =>
+      [...DEMO_NOTIFICATIONS].sort(
+        (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+      ),
+    [],
+  );
 
   const dashboardCards = useMemo(() => countByBucket(mergedJobs), [mergedJobs]);
 
+  // Accept persists APPROVED -> SCHEDULED on the real facade. We flip the local overlay
+  // first for instant feedback, then reconcile from the server; an API error just leaves
+  // the optimistic state in place (graceful — same as the offline path).
   const acceptJob = useCallback(
     (id: string) => {
       store.acceptJob(id);
+      if (apiConnected) {
+        void apiAcceptJob(id)
+          .then(() => refresh())
+          .catch(() => undefined);
+      }
     },
-    [store],
+    [apiConnected, refresh, store],
   );
 
   const declineJob = useCallback(
@@ -141,6 +138,9 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [store],
   );
 
+  // Quote submission has no clean facade analog yet — the real `POST /quotes` takes a
+  // subtotal/gst/total breakdown (not labour/material/call-out) and does not move the
+  // job's status — so the contractor's quote stays an optimistic local update for now.
   const submitQuotation = useCallback(
     async (
       jobId: string,
@@ -155,24 +155,6 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     ) => {
       const total =
         data.labourCost + data.materialCost + (data.callOutFee ?? 0);
-      const scope = data.notes
-        ? `${data.scope}\n\nNotes: ${data.notes}`
-        : data.scope;
-
-      if (apiConnected) {
-        await createQuotation({
-          maintenanceRequestId: jobId,
-          contractorId: CONTRACTOR_ID,
-          price: total,
-          currency: 'AUD',
-          scope,
-          availableSchedule: data.estimatedCompletion,
-          actorRole: 'contractor',
-        });
-        await refresh();
-        return;
-      }
-
       store.updateJob(jobId, {
         status: 'awaiting_quotation_approval',
         bucket: 'awaiting_quotation_approval',
@@ -191,15 +173,22 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         },
       });
     },
-    [apiConnected, refresh, store],
+    [store],
   );
 
+  // Complete persists SCHEDULED -> COMPLETED on the real facade, then re-reads. If the
+  // server rejects the move (e.g. the job is not SCHEDULED) we fall back to the optimistic
+  // local update so the flow still advances.
   const markComplete = useCallback(
     async (jobId: string) => {
       if (apiConnected) {
-        await setCompletionEvidence(jobId, true);
-        await refresh();
-        return;
+        try {
+          await apiCompleteJob(jobId, {});
+          await refresh();
+          return;
+        } catch {
+          // fall through to the optimistic local update
+        }
       }
       store.updateJob(jobId, {
         completionEvidenceUploaded: true,
@@ -210,13 +199,10 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [apiConnected, refresh, store],
   );
 
+  // Invoice submission is staff/accounting-side — the contractor facade has no endpoint
+  // for it — so it stays an optimistic local update until that facade lands.
   const submitInvoice = useCallback(
     async (jobId: string) => {
-      if (apiConnected) {
-        await setInvoiceUploaded(jobId, true);
-        await refresh();
-        return;
-      }
       store.updateJob(jobId, {
         invoiceUploaded: true,
         status: 'invoice_submitted',
@@ -224,7 +210,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         paymentStatus: 'pending_payment',
       });
     },
-    [apiConnected, refresh, store],
+    [store],
   );
 
   const value: ContractorDataContextValue = {
@@ -259,6 +245,3 @@ export function useContractorData(): ContractorDataContextValue {
   }
   return ctx;
 }
-
-// Re-export upload for evidence pages
-export { uploadAttachment };
