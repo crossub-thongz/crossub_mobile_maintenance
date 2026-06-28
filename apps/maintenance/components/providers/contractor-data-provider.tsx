@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead as apiMarkAllNotificationsRead,
   markNotificationRead as apiMarkNotificationRead,
   replyToThread as apiReplyToThread,
+  uploadJobPhoto as apiUploadJobPhoto,
   fetchJobs,
   fetchMessages,
   fetchNotifications,
@@ -29,6 +30,7 @@ import {
   applyLocalJobUpdates,
   useContractorStore,
 } from '@/lib/store';
+import { fileToBase64 } from '@/lib/utils';
 import {
   countByBucket,
   DEMO_JOBS,
@@ -68,6 +70,7 @@ interface ContractorDataContextValue {
       notes?: string;
     },
   ) => Promise<void>;
+  uploadJobPhotos: (jobId: string, files: File[]) => Promise<void>;
   markComplete: (jobId: string) => Promise<void>;
   submitInvoice: (jobId: string) => Promise<void>;
   sendThreadReply: (threadId: string, body: string) => Promise<void>;
@@ -198,6 +201,26 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [store],
   );
 
+  // Upload completion/evidence photos for real: each File is read as base64 and pushed
+  // through the facade (`POST /contractor/jobs/:id/photos/upload`), which stores it in R2
+  // and appends the URL to the job's result photos. Offline (no live API) this is a no-op
+  // — the demo board has no server to upload to, matching the old mock-upload behaviour.
+  const uploadJobPhotos = useCallback(
+    async (jobId: string, files: File[]) => {
+      if (!apiConnected || files.length === 0) return;
+      for (const file of files) {
+        const contentBase64 = await fileToBase64(file);
+        await apiUploadJobPhoto(jobId, {
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size,
+          contentBase64,
+        });
+      }
+    },
+    [apiConnected],
+  );
+
   // Complete persists SCHEDULED -> COMPLETED on the real facade, then re-reads. If the
   // server rejects the move (e.g. the job is not SCHEDULED) we fall back to the optimistic
   // local update so the flow still advances.
@@ -324,6 +347,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     acceptJob,
     declineJob,
     submitQuotation,
+    uploadJobPhotos,
     markComplete,
     submitInvoice,
     sendThreadReply,

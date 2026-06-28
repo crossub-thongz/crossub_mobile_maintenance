@@ -16,7 +16,7 @@ export default function CompletePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { jobs, markComplete } = useContractorData();
+  const { jobs, uploadJobPhotos, markComplete } = useContractorData();
   const [notes, setNotes] = useState('');
   const [parts, setParts] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -32,11 +32,12 @@ export default function CompletePage() {
     }
     setSubmitting(true);
     try {
+      await uploadJobPhotos(job.id, files);
       await markComplete(job.id);
       toast.success('Work marked complete — awaiting tenant confirmation');
       router.push(jobDetail(job.id));
     } catch {
-      toast.error('Failed to mark complete');
+      toast.error('Failed to upload evidence or mark complete');
     } finally {
       setSubmitting(false);
     }

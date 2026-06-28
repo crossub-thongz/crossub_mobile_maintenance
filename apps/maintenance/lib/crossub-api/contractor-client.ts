@@ -8,6 +8,8 @@ export type ContractorQuote = components['schemas']['ContractorQuoteResponseDto'
 export type CompleteContractorJob = components['schemas']['CompleteContractorJobDto'];
 export type SubmitContractorQuote = components['schemas']['SubmitContractorQuoteDto'];
 export type AddContractorPhotos = components['schemas']['AddContractorPhotosDto'];
+export type UploadContractorPhoto =
+  components['schemas']['UploadContractorPhotoDto'];
 export type ContractorMessageThread =
   components['schemas']['ContractorMessageThreadResponseDto'];
 export type CreateContractorMessageThread =
@@ -68,6 +70,20 @@ export async function submitQuote(
     body,
   });
   if (error || !data) throw new Error('Failed to submit quote');
+  return data;
+}
+
+/** Upload a completion/evidence photo (base64 → R2) for a job
+ * (`POST /api/v1/contractor/jobs/{jobId}/photos/upload`). Returns the job's updated photos. */
+export async function uploadJobPhoto(
+  jobId: string,
+  body: UploadContractorPhoto,
+): Promise<ContractorJobPhotos> {
+  const { data, error } = await crossub.POST(
+    '/contractor/jobs/{jobId}/photos/upload',
+    { params: { path: { jobId } }, body },
+  );
+  if (error || !data) throw new Error('Failed to upload photo');
   return data;
 }
 
