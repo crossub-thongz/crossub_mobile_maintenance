@@ -32,7 +32,10 @@ export default function InvoicePage() {
     }
     setSubmitting(true);
     try {
-      await submitInvoice(job.id);
+      await submitInvoice(job.id, {
+        invoiceNumber: invoiceNumber.trim(),
+        invoiceAmount: amount,
+      });
       toast.success('Invoice submitted to Agent / Accounting');
       router.push(jobDetail(job.id));
     } catch {

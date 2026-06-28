@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead as apiMarkAllNotificationsRead,
   markNotificationRead as apiMarkNotificationRead,
   replyToThread as apiReplyToThread,
+  submitInvoice as apiSubmitInvoice,
   submitQuote as apiSubmitQuote,
   uploadJobPhoto as apiUploadJobPhoto,
   fetchJobs,
@@ -73,7 +74,10 @@ interface ContractorDataContextValue {
   ) => Promise<void>;
   uploadJobPhotos: (jobId: string, files: File[]) => Promise<void>;
   markComplete: (jobId: string) => Promise<void>;
-  submitInvoice: (jobId: string) => Promise<void>;
+  submitInvoice: (
+    jobId: string,
+    data: { invoiceNumber: string; invoiceAmount?: number },
+  ) => Promise<void>;
   sendThreadReply: (threadId: string, body: string) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -266,10 +270,28 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [apiConnected, refresh, store],
   );
 
-  // Invoice submission is staff/accounting-side — the contractor facade has no endpoint
-  // for it — so it stays an optimistic local update until that facade lands.
+  // Invoice persists COMPLETED -> INVOICED on the real facade
+  // (`POST /contractor/jobs/:id/invoice`), stamping the invoice number/amount/date on the
+  // job, then re-reads (the board derives "pending payment" off the INVOICED status). If
+  // the server rejects the move (e.g. the job isn't COMPLETED) we fall back to the
+  // optimistic local update so the flow still advances.
   const submitInvoice = useCallback(
-    async (jobId: string) => {
+    async (
+      jobId: string,
+      data: { invoiceNumber: string; invoiceAmount?: number },
+    ) => {
+      if (apiConnected) {
+        try {
+          await apiSubmitInvoice(jobId, {
+            invoiceNumber: data.invoiceNumber,
+            invoiceAmount: data.invoiceAmount,
+          });
+          await refresh();
+          return;
+        } catch {
+          // fall through to the optimistic local update
+        }
+      }
       store.updateJob(jobId, {
         invoiceUploaded: true,
         status: 'invoice_submitted',
@@ -277,7 +299,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         paymentStatus: 'pending_payment',
       });
     },
-    [store],
+    [apiConnected, refresh, store],
   );
 
   // Reply persists to the real facade (`POST /contractor/messages/:id/reply`); we replace

@@ -7,6 +7,8 @@ export type ContractorJobPhotos = components['schemas']['ContractorJobPhotosDto'
 export type ContractorQuote = components['schemas']['ContractorQuoteResponseDto'];
 export type CompleteContractorJob = components['schemas']['CompleteContractorJobDto'];
 export type SubmitContractorQuote = components['schemas']['SubmitContractorQuoteDto'];
+export type SubmitContractorInvoice =
+  components['schemas']['SubmitContractorInvoiceDto'];
 export type AddContractorPhotos = components['schemas']['AddContractorPhotosDto'];
 export type UploadContractorPhoto =
   components['schemas']['UploadContractorPhotoDto'];
@@ -70,6 +72,20 @@ export async function submitQuote(
     body,
   });
   if (error || !data) throw new Error('Failed to submit quote');
+  return data;
+}
+
+/** Invoice a finished job, COMPLETED → INVOICED
+ * (`POST /api/v1/contractor/jobs/{jobId}/invoice`). Returns the updated job. */
+export async function submitInvoice(
+  jobId: string,
+  body: SubmitContractorInvoice,
+): Promise<ContractorJob> {
+  const { data, error } = await crossub.POST('/contractor/jobs/{jobId}/invoice', {
+    params: { path: { jobId } },
+    body,
+  });
+  if (error || !data) throw new Error('Failed to submit invoice');
   return data;
 }
 
