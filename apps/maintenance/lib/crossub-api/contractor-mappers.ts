@@ -25,6 +25,7 @@ import type {
   MaintenanceJob,
   MessageThread,
   Priority,
+  Quotation,
   ThreadMessage,
 } from '@/lib/types';
 
@@ -76,9 +77,52 @@ const JOB_VIEW: Record<
 
 const FALLBACK_VIEW = { bucket: 'pending_jobs', status: 'assigned' } as const;
 
+/** Where a job lands once it carries a still-pending contractor quote (derived from the
+ * persisted quote, NOT a status transition — the job stays APPROVED until staff schedule). */
+const AWAITING_QUOTE_VIEW = {
+  bucket: 'awaiting_quotation_approval',
+  status: 'awaiting_quotation_approval',
+} as const;
+
+/** Statuses in which a freshly-submitted quote still reads as "awaiting approval" — the
+ * job hasn't been scheduled past quoting yet (SCHEDULED/COMPLETED/etc. keep their view). */
+const QUOTE_PENDING_STATUSES = new Set<ContractorJob['status']>([
+  MAINTENANCE_STATUS.OPEN,
+  MAINTENANCE_STATUS.APPROVED,
+  MAINTENANCE_STATUS.QUOTING,
+]);
+
 /** The thin facade has no priority — only an `urgent` flag. */
 function toPriority(urgent: boolean): Priority {
   return urgent ? 'high' : 'medium';
+}
+
+/**
+ * Project the job card's embedded latest contractor quote onto the app's Quotation
+ * view-model. The breakdown columns (labour/material/call-out + estimated completion) map
+ * straight across; `totalAmount` prefers the persisted total, then subtotal, then the sum
+ * of the breakdown. There's no persisted approval state yet, so it always reads `submitted`.
+ */
+function toQuotation(
+  jobId: string,
+  q: NonNullable<ContractorJob['quote']>,
+): Quotation {
+  const labour = q.labourCost ?? 0;
+  const material = q.materialCost ?? 0;
+  const callOut = q.callOutFee ?? 0;
+  return {
+    id: q.id,
+    jobId,
+    labourCost: labour,
+    materialCost: material,
+    callOutFee: q.callOutFee ?? undefined,
+    totalAmount: q.total ?? q.subtotal ?? labour + material + callOut,
+    scope: asString(q.descriptions) ?? '',
+    estimatedCompletion: asString(q.estimatedCompletion) ?? '',
+    notes: asString(q.terms) ?? undefined,
+    status: 'submitted',
+    submittedAt: asString(q.createdAt) ?? '',
+  };
 }
 
 /**
@@ -95,7 +139,13 @@ const CROSSUB_CONTACT: JobContact = {
 
 /** Project one contractor-facade job onto the app's MaintenanceJob card. */
 export function toMaintenanceJob(job: ContractorJob): MaintenanceJob {
-  const view = JOB_VIEW[job.status] ?? FALLBACK_VIEW;
+  const quotation = job.quote ? toQuotation(job.id, job.quote) : undefined;
+  // A persisted, still-pending quote moves the job into the "awaiting quotation approval"
+  // column — derived from the quote's presence, not a status change on the request.
+  const view =
+    quotation && QUOTE_PENDING_STATUSES.has(job.status)
+      ? AWAITING_QUOTE_VIEW
+      : JOB_VIEW[job.status] ?? FALLBACK_VIEW;
   const category = asString(job.categoryName) ?? 'General maintenance';
   const address =
     [asString(job.propertyAddress), asString(job.propertySuburb)]
@@ -123,6 +173,7 @@ export function toMaintenanceJob(job: ContractorJob): MaintenanceJob {
     agent: PLACEHOLDER_AGENT,
     crossubContact: CROSSUB_CONTACT,
     photos: [],
+    quotation,
     completionEvidenceUploaded: done,
     tenantConfirmed: false,
     invoiceUploaded: invoiced,

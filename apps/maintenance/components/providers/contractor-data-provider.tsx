@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead as apiMarkAllNotificationsRead,
   markNotificationRead as apiMarkNotificationRead,
   replyToThread as apiReplyToThread,
+  submitQuote as apiSubmitQuote,
   uploadJobPhoto as apiUploadJobPhoto,
   fetchJobs,
   fetchMessages,
@@ -163,9 +164,12 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [store],
   );
 
-  // Quote submission has no clean facade analog yet — the real `POST /quotes` takes a
-  // subtotal/gst/total breakdown (not labour/material/call-out) and does not move the
-  // job's status — so the contractor's quote stays an optimistic local update for now.
+  // Quote submission persists a real MaintenanceQuote via the facade
+  // (`POST /contractor/jobs/:id/quotes`) — the breakdown (labour/material/call-out +
+  // estimated completion) now has dedicated columns, so the contractor's quote is no
+  // longer just a local note. We re-read after (the job card carries its latest quote, so
+  // the board derives "awaiting quotation approval" off the persisted row — no status
+  // transition). Offline (or on error) we fall back to the optimistic local update.
   const submitQuotation = useCallback(
     async (
       jobId: string,
@@ -178,8 +182,26 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         notes?: string;
       },
     ) => {
-      const total =
-        data.labourCost + data.materialCost + (data.callOutFee ?? 0);
+      const callOut = data.callOutFee ?? 0;
+      const total = data.labourCost + data.materialCost + callOut;
+      if (apiConnected) {
+        try {
+          await apiSubmitQuote(jobId, {
+            subtotal: total,
+            total,
+            labourCost: data.labourCost,
+            materialCost: data.materialCost,
+            callOutFee: callOut,
+            estimatedCompletion: data.estimatedCompletion,
+            descriptions: data.scope,
+            terms: data.notes,
+          });
+          await refresh();
+          return;
+        } catch {
+          // fall through to the optimistic local update
+        }
+      }
       store.updateJob(jobId, {
         status: 'awaiting_quotation_approval',
         bucket: 'awaiting_quotation_approval',
@@ -198,7 +220,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         },
       });
     },
-    [store],
+    [apiConnected, refresh, store],
   );
 
   // Upload completion/evidence photos for real: each File is read as base64 and pushed
