@@ -72,3 +72,27 @@ export const COMM_CHANNEL_TO_MESSAGE: Record<string, 'app' | 'email'> = {
   [COMM_CHANNEL.APP]: 'app',
   [COMM_CHANNEL.EMAIL]: 'email',
 };
+
+/** ContractorNotificationType — the kind of a contractor notification. */
+export const CONTRACTOR_NOTIFICATION_TYPE = {
+  JOB_ASSIGNED: 'JOB_ASSIGNED',
+  QUOTE_UPDATE: 'QUOTE_UPDATE',
+  PAYMENT: 'PAYMENT',
+  REMINDER: 'REMINDER',
+  MESSAGE: 'MESSAGE',
+} as const;
+
+/**
+ * Map the API's `ContractorNotificationType` onto the app's lowercase
+ * `ContractorNotification.type` union — a 1:1 lowercasing of the enum members.
+ */
+export const CONTRACTOR_NOTIFICATION_TYPE_TO_FE: Record<
+  string,
+  'job_assigned' | 'quote_update' | 'payment' | 'reminder' | 'message'
+> = {
+  [CONTRACTOR_NOTIFICATION_TYPE.JOB_ASSIGNED]: 'job_assigned',
+  [CONTRACTOR_NOTIFICATION_TYPE.QUOTE_UPDATE]: 'quote_update',
+  [CONTRACTOR_NOTIFICATION_TYPE.PAYMENT]: 'payment',
+  [CONTRACTOR_NOTIFICATION_TYPE.REMINDER]: 'reminder',
+  [CONTRACTOR_NOTIFICATION_TYPE.MESSAGE]: 'message',
+};

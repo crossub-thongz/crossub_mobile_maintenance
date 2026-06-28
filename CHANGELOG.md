@@ -3,9 +3,11 @@
 ## 2026-06-28
 
 ### Added
+- Live Notifications (Phase B of the maintenance zero-mock plan): `Notifications` now reads the contractor's real feed from the v1 facade (`GET /api/v1/contractor/notifications`) via new `lib/crossub-api/contractor-client.ts` helpers (`fetchNotifications`/`markNotificationRead`/`markAllNotificationsRead`), a `mapContractorNotifications` mapper (`ContractorNotificationResponseDto` → the `ContractorNotification` view-model, `type` lowercased), and a `CONTRACTOR_NOTIFICATION_TYPE` mirror + FE map in `constants/api-enums.ts`.
 - Live Communication Hub (Phase A of the maintenance zero-mock plan): `Messages` now reads the contractor's real threads from the v1 facade (`GET /api/v1/contractor/messages`) via new `lib/crossub-api/contractor-client.ts` helpers (`fetchMessages`/`createMessageThread`/`replyToThread`), a `mapContractorMessageThreads` mapper (`ContractorMessageThreadResponseDto` → the `MessageThread` view-model), and `CommUserType`/`CommChannel` mirrors + role/channel maps in `constants/api-enums.ts`.
 
 ### Changed
+- `ContractorDataProvider` loads notifications live (same per-domain `Promise.allSettled`, falling back to `DEMO_NOTIFICATIONS`); the Notifications screen gained a "Mark all read" control and marks a notification read on open, both persisting to the facade (`PATCH /contractor/notifications/{id}/read`, `POST /contractor/notifications/read-all`) with optimistic local flips.
 - `ContractorDataProvider` loads messages live (per-domain `Promise.allSettled`, falling back to `DEMO_MESSAGES` on error) and the message-detail reply box now persists to the facade (`POST /api/v1/contractor/messages/{id}/reply`) with optimistic local fallback — no screen restructure.
 
 ## 2026-06-27

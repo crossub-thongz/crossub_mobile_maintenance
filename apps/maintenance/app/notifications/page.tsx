@@ -8,14 +8,27 @@ import { useContractorData } from '@/components/providers/contractor-data-provid
 import { formatRelative } from '@/lib/utils';
 
 export default function NotificationsPage() {
-  const { notifications } = useContractorData();
+  const { notifications, markNotificationRead, markAllNotificationsRead } =
+    useContractorData();
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <ContractorShell title="Notification history">
       <div className="space-y-3">
-        <p className="text-muted-foreground text-sm">
-          All push notifications stored for audit and review.
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-sm">
+            All push notifications stored for audit and review.
+          </p>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={() => void markAllNotificationsRead()}
+              className="text-primary shrink-0 text-xs font-medium"
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
 
         {notifications.length === 0 ? (
           <EmptyState title="No notifications" />
@@ -24,6 +37,9 @@ export default function NotificationsPage() {
             <Link
               key={n.id}
               href={n.href}
+              onClick={() => {
+                if (!n.read) void markNotificationRead(n.id);
+              }}
               className={`block rounded-xl border p-4 transition-colors hover:border-primary/40 ${
                 n.read ? 'bg-card' : 'border-primary/30 bg-primary/5'
               }`}

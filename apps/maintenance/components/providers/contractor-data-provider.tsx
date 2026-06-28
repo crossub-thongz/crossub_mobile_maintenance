@@ -12,13 +12,17 @@ import {
 import {
   acceptJob as apiAcceptJob,
   completeJob as apiCompleteJob,
+  markAllNotificationsRead as apiMarkAllNotificationsRead,
+  markNotificationRead as apiMarkNotificationRead,
   replyToThread as apiReplyToThread,
   fetchJobs,
   fetchMessages,
+  fetchNotifications,
 } from '@/lib/crossub-api/contractor-client';
 import {
   mapContractorJobs,
   mapContractorMessageThreads,
+  mapContractorNotifications,
   toMessageThread,
 } from '@/lib/crossub-api/contractor-mappers';
 import {
@@ -67,6 +71,8 @@ interface ContractorDataContextValue {
   markComplete: (jobId: string) => Promise<void>;
   submitInvoice: (jobId: string) => Promise<void>;
   sendThreadReply: (threadId: string, body: string) => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 }
 
 const ContractorDataContext = createContext<ContractorDataContextValue | undefined>(
@@ -77,6 +83,8 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   const store = useContractorStore();
   const [jobsFromApi, setJobsFromApi] = useState<MaintenanceJob[]>([]);
   const [messages, setMessages] = useState<MessageThread[]>(DEMO_MESSAGES);
+  const [notifications, setNotifications] =
+    useState<ContractorNotification[]>(DEMO_NOTIFICATIONS);
   const [apiConnected, setApiConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,11 +95,13 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   // never blanks; local optimistic updates (accept/quote/complete) overlay on top.
   const refresh = useCallback(async () => {
     setLoading(true);
-    // Jobs and messages are independent domains — load them per-domain (allSettled) so a
-    // failure in one never blanks the other; each falls back to its demo seed.
-    const [jobsRes, messagesRes] = await Promise.allSettled([
+    // Jobs, messages and notifications are independent domains — load them per-domain
+    // (allSettled) so a failure in one never blanks the others; each falls back to its
+    // demo seed.
+    const [jobsRes, messagesRes, notificationsRes] = await Promise.allSettled([
       fetchJobs(),
       fetchMessages(),
+      fetchNotifications(),
     ]);
     if (jobsRes.status === 'fulfilled') {
       setJobsFromApi(mapContractorJobs(jobsRes.value));
@@ -107,6 +117,11 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
         ? mapContractorMessageThreads(messagesRes.value)
         : DEMO_MESSAGES,
     );
+    setNotifications(
+      notificationsRes.status === 'fulfilled'
+        ? mapContractorNotifications(notificationsRes.value)
+        : DEMO_NOTIFICATIONS,
+    );
     setLoading(false);
   }, []);
 
@@ -120,16 +135,6 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     const combined = [...jobsFromApi, ...demoOnly];
     return applyLocalJobUpdates(combined, store);
   }, [jobsFromApi, store]);
-
-  // The contractor facade exposes no notifications endpoint yet (a documented gap), so
-  // notifications stay on demo data until that facade lands.
-  const notifications = useMemo(
-    () =>
-      [...DEMO_NOTIFICATIONS].sort(
-        (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
-      ),
-    [],
-  );
 
   const dashboardCards = useMemo(() => countByBucket(mergedJobs), [mergedJobs]);
 
@@ -276,6 +281,35 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [apiConnected],
   );
 
+  // Mark-read flips the local state immediately, then persists to the facade
+  // (`PATCH /contractor/notifications/:id/read`); an API error keeps the optimistic flip.
+  const markNotificationRead = useCallback(
+    async (id: string) => {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+      if (apiConnected) {
+        try {
+          await apiMarkNotificationRead(id);
+        } catch {
+          // keep the optimistic flip
+        }
+      }
+    },
+    [apiConnected],
+  );
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (apiConnected) {
+      try {
+        await apiMarkAllNotificationsRead();
+      } catch {
+        // keep the optimistic flip
+      }
+    }
+  }, [apiConnected]);
+
   const value: ContractorDataContextValue = {
     profile: DEMO_PROFILE,
     jobs: mergedJobs,
@@ -293,6 +327,8 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     markComplete,
     submitInvoice,
     sendThreadReply,
+    markNotificationRead,
+    markAllNotificationsRead,
   };
 
   return (

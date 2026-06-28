@@ -14,6 +14,11 @@ export type CreateContractorMessageThread =
   components['schemas']['CreateContractorMessageThreadDto'];
 export type SendContractorMessage =
   components['schemas']['SendContractorMessageDto'];
+// Aliased `...Dto` to avoid colliding with the `ContractorNotification` view-model in lib/types.
+export type ContractorNotificationDto =
+  components['schemas']['ContractorNotificationResponseDto'];
+export type ContractorNotificationsReadResult =
+  components['schemas']['ContractorNotificationsReadResultDto'];
 
 /** Assigned maintenance jobs for the signed-in contractor (`GET /api/v1/contractor/jobs`). */
 export async function fetchJobs(): Promise<ContractorJob[]> {
@@ -92,5 +97,31 @@ export async function replyToThread(
     { params: { path: { threadId } }, body },
   );
   if (error || !data) throw new Error('Failed to send reply');
+  return data;
+}
+
+/** The signed-in contractor's notifications (`GET /api/v1/contractor/notifications`). */
+export async function fetchNotifications(): Promise<ContractorNotificationDto[]> {
+  const { data, error } = await crossub.GET('/contractor/notifications');
+  if (error || !data) throw new Error('Failed to load notifications');
+  return data;
+}
+
+/** Mark one notification read (`PATCH /api/v1/contractor/notifications/{id}/read`). */
+export async function markNotificationRead(
+  notificationId: string,
+): Promise<ContractorNotificationDto> {
+  const { data, error } = await crossub.PATCH(
+    '/contractor/notifications/{notificationId}/read',
+    { params: { path: { notificationId } } },
+  );
+  if (error || !data) throw new Error('Failed to mark notification read');
+  return data;
+}
+
+/** Mark all notifications read (`POST /api/v1/contractor/notifications/read-all`). */
+export async function markAllNotificationsRead(): Promise<ContractorNotificationsReadResult> {
+  const { data, error } = await crossub.POST('/contractor/notifications/read-all');
+  if (error || !data) throw new Error('Failed to mark all notifications read');
   return data;
 }

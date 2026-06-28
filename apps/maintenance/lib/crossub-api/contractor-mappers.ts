@@ -14,10 +14,12 @@ import {
   COMM_CHANNEL,
   COMM_CHANNEL_TO_MESSAGE,
   COMM_USER_TYPE_TO_ROLE,
+  CONTRACTOR_NOTIFICATION_TYPE_TO_FE,
   MAINTENANCE_STATUS,
 } from '@/constants/api-enums';
 import type {
   ContractorJobStatus,
+  ContractorNotification,
   JobBucket,
   JobContact,
   MaintenanceJob,
@@ -29,6 +31,7 @@ import type {
 import type {
   ContractorJob,
   ContractorMessageThread,
+  ContractorNotificationDto,
 } from './contractor-client';
 
 /**
@@ -188,4 +191,27 @@ export function mapContractorMessageThreads(
   threads: ContractorMessageThread[],
 ): MessageThread[] {
   return threads.map(toMessageThread);
+}
+
+/** Project one contractor-facade notification onto the app's ContractorNotification. */
+export function toContractorNotification(
+  n: ContractorNotificationDto,
+): ContractorNotification {
+  return {
+    id: n.id,
+    type: CONTRACTOR_NOTIFICATION_TYPE_TO_FE[n.type] ?? 'message',
+    title: n.title,
+    body: n.body,
+    jobTrackingNumber: asString(n.jobTrackingNumber) ?? undefined,
+    at: n.at,
+    read: n.read,
+    href: n.href,
+  };
+}
+
+/** Map the contractor's notifications onto the app's ContractorNotification view-models. */
+export function mapContractorNotifications(
+  notifications: ContractorNotificationDto[],
+): ContractorNotification[] {
+  return notifications.map(toContractorNotification);
 }
