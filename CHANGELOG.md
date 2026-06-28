@@ -10,6 +10,7 @@
 - Live Communication Hub (Phase A of the maintenance zero-mock plan): `Messages` now reads the contractor's real threads from the v1 facade (`GET /api/v1/contractor/messages`) via new `lib/crossub-api/contractor-client.ts` helpers (`fetchMessages`/`createMessageThread`/`replyToThread`), a `mapContractorMessageThreads` mapper (`ContractorMessageThreadResponseDto` → the `MessageThread` view-model), and `CommUserType`/`CommChannel` mirrors + role/channel maps in `constants/api-enums.ts`.
 
 ### Changed
+- The jobs board now shows ONLY the contractor's real API jobs when the API is reachable — the demo seeds are no longer blended in alongside the live data. The demo seeds remain solely as an offline fallback (when the API is unreachable), with the existing "showing demo data" banner making that state explicit.
 - `ContractorDataProvider.submitInvoice` now persists to the facade (`COMPLETED → INVOICED`, re-reading after, with optimistic-local fallback offline/on error) rather than only writing the local store; its signature gained the entered invoice number + amount.
 - `ContractorDataProvider.submitQuotation` now persists to the facade (re-reading after, with optimistic-local fallback offline/on error) rather than only writing the local store — so a submitted quote survives a refresh and reconciles from the server.
 - The job-completion flow now uploads the selected completion photos to the facade before marking the job complete (was a discarded mock file picker); upload failures surface a toast and block completion so evidence is never silently lost.

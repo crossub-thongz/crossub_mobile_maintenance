@@ -137,12 +137,14 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     void refresh();
   }, [refresh]);
 
+  // When live, the board shows ONLY the contractor's real API jobs — no demo seeds
+  // blended in. The demo seeds are used solely as an offline fallback (when the API is
+  // unreachable) so the board never blanks; the apiError banner makes that state explicit
+  // (mirrors how messages/notifications replace, not merge, their live data).
   const mergedJobs = useMemo(() => {
-    const apiIds = new Set(jobsFromApi.map((j) => j.id));
-    const demoOnly = DEMO_JOBS.filter((j) => !apiIds.has(j.id));
-    const combined = [...jobsFromApi, ...demoOnly];
-    return applyLocalJobUpdates(combined, store);
-  }, [jobsFromApi, store]);
+    const base = apiConnected ? jobsFromApi : DEMO_JOBS;
+    return applyLocalJobUpdates(base, store);
+  }, [apiConnected, jobsFromApi, store]);
 
   const dashboardCards = useMemo(() => countByBucket(mergedJobs), [mergedJobs]);
 
