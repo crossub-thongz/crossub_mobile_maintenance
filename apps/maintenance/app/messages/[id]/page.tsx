@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { notFound, useParams } from 'next/navigation';
 
 import { ContractorShell } from '@/components/layout/contractor-shell';
@@ -10,13 +12,28 @@ import { formatDateTime } from '@/lib/utils';
 export default function MessageDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { messages } = useContractorData();
+  const { messages, sendThreadReply } = useContractorData();
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
 
   const thread =
     messages.find((m) => m.id === id) ??
     messages.find((m) => m.jobId && id.includes(m.jobId.slice(-3)));
 
   if (!thread) notFound();
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setDraft('');
+    try {
+      await sendThreadReply(thread!.id, text);
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <ContractorShell title={thread.subject} backHref={ROUTES.MESSAGES}>
@@ -50,19 +67,24 @@ export default function MessageDetailPage() {
           ))}
         </div>
 
-        <form className="fixed bottom-20 left-1/2 w-full max-w-lg -translate-x-1/2 px-4">
+        <form
+          onSubmit={handleSend}
+          className="fixed bottom-20 left-1/2 w-full max-w-lg -translate-x-1/2 px-4"
+        >
           <div className="flex gap-2 rounded-xl border bg-card p-2 shadow-lg">
             <input
               type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
               placeholder="Type a message..."
               className="flex-1 bg-transparent px-2 text-sm outline-none"
             />
             <button
               type="submit"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-              onClick={(e) => e.preventDefault()}
+              disabled={sending || draft.trim().length === 0}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >
-              Send
+              {sending ? 'Sending…' : 'Send'}
             </button>
           </div>
         </form>

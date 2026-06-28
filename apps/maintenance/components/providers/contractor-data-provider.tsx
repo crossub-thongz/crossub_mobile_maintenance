@@ -12,9 +12,15 @@ import {
 import {
   acceptJob as apiAcceptJob,
   completeJob as apiCompleteJob,
+  replyToThread as apiReplyToThread,
   fetchJobs,
+  fetchMessages,
 } from '@/lib/crossub-api/contractor-client';
-import { mapContractorJobs } from '@/lib/crossub-api/contractor-mappers';
+import {
+  mapContractorJobs,
+  mapContractorMessageThreads,
+  toMessageThread,
+} from '@/lib/crossub-api/contractor-mappers';
 import {
   applyLocalJobUpdates,
   useContractorStore,
@@ -60,6 +66,7 @@ interface ContractorDataContextValue {
   ) => Promise<void>;
   markComplete: (jobId: string) => Promise<void>;
   submitInvoice: (jobId: string) => Promise<void>;
+  sendThreadReply: (threadId: string, body: string) => Promise<void>;
 }
 
 const ContractorDataContext = createContext<ContractorDataContextValue | undefined>(
@@ -69,6 +76,7 @@ const ContractorDataContext = createContext<ContractorDataContextValue | undefin
 export function ContractorDataProvider({ children }: { children: React.ReactNode }) {
   const store = useContractorStore();
   const [jobsFromApi, setJobsFromApi] = useState<MaintenanceJob[]>([]);
+  const [messages, setMessages] = useState<MessageThread[]>(DEMO_MESSAGES);
   const [apiConnected, setApiConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,18 +87,27 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   // never blanks; local optimistic updates (accept/quote/complete) overlay on top.
   const refresh = useCallback(async () => {
     setLoading(true);
-    try {
-      const jobs = await fetchJobs();
-      setJobsFromApi(mapContractorJobs(jobs));
+    // Jobs and messages are independent domains — load them per-domain (allSettled) so a
+    // failure in one never blanks the other; each falls back to its demo seed.
+    const [jobsRes, messagesRes] = await Promise.allSettled([
+      fetchJobs(),
+      fetchMessages(),
+    ]);
+    if (jobsRes.status === 'fulfilled') {
+      setJobsFromApi(mapContractorJobs(jobsRes.value));
       setApiConnected(true);
       setApiError(null);
-    } catch {
+    } else {
       setApiConnected(false);
       setApiError('Unable to reach CROSSUB API — showing demo data');
       setJobsFromApi([]);
-    } finally {
-      setLoading(false);
     }
+    setMessages(
+      messagesRes.status === 'fulfilled'
+        ? mapContractorMessageThreads(messagesRes.value)
+        : DEMO_MESSAGES,
+    );
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -213,11 +230,57 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [store],
   );
 
+  // Reply persists to the real facade (`POST /contractor/messages/:id/reply`); we replace
+  // the thread in state with the server's authoritative copy. Offline (or on error) we
+  // append an optimistic local message so the conversation still advances.
+  const sendThreadReply = useCallback(
+    async (threadId: string, body: string) => {
+      const text = body.trim();
+      if (!text) return;
+      if (apiConnected) {
+        try {
+          const updated = await apiReplyToThread(threadId, { body: text });
+          const mapped = toMessageThread(updated);
+          setMessages((prev) =>
+            prev.map((t) => (t.id === threadId ? mapped : t)),
+          );
+          return;
+        } catch {
+          // fall through to the optimistic local append
+        }
+      }
+      const now = new Date().toISOString();
+      setMessages((prev) =>
+        prev.map((t) =>
+          t.id === threadId
+            ? {
+                ...t,
+                lastMessage: text,
+                lastAt: now,
+                messages: [
+                  ...t.messages,
+                  {
+                    id: `local-${now}`,
+                    at: now,
+                    from: 'You',
+                    fromRole: 'contractor',
+                    body: text,
+                    channel: 'app',
+                  },
+                ],
+              }
+            : t,
+        ),
+      );
+    },
+    [apiConnected],
+  );
+
   const value: ContractorDataContextValue = {
     profile: DEMO_PROFILE,
     jobs: mergedJobs,
     jobsFromApi,
-    messages: DEMO_MESSAGES,
+    messages,
     notifications,
     dashboardCards,
     apiConnected,
@@ -229,6 +292,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     submitQuotation,
     markComplete,
     submitInvoice,
+    sendThreadReply,
   };
 
   return (

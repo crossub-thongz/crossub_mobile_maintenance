@@ -11,6 +11,9 @@
  * land on safe placeholders — exactly what the screens already tolerate for demo data.
  */
 import {
+  COMM_CHANNEL,
+  COMM_CHANNEL_TO_MESSAGE,
+  COMM_USER_TYPE_TO_ROLE,
   MAINTENANCE_STATUS,
 } from '@/constants/api-enums';
 import type {
@@ -18,10 +21,15 @@ import type {
   JobBucket,
   JobContact,
   MaintenanceJob,
+  MessageThread,
   Priority,
+  ThreadMessage,
 } from '@/lib/types';
 
-import type { ContractorJob } from './contractor-client';
+import type {
+  ContractorJob,
+  ContractorMessageThread,
+} from './contractor-client';
 
 /**
  * The generated contract types nullable columns inconsistently — some surface as
@@ -125,4 +133,59 @@ export function toMaintenanceJob(job: ContractorJob): MaintenanceJob {
 /** Map a page of contractor-facade jobs onto the app's MaintenanceJob cards. */
 export function mapContractorJobs(jobs: ContractorJob[]): MaintenanceJob[] {
   return jobs.map(toMaintenanceJob);
+}
+
+/**
+ * Derive a thread's channel badge (`'app' | 'email' | 'mixed'`) from its messages'
+ * per-message channels. All-app reads `'app'`, all-email `'email'`, a blend `'mixed'`;
+ * an empty thread defaults to `'app'`.
+ */
+function threadChannel(thread: ContractorMessageThread): MessageThread['channel'] {
+  const hasEmail = thread.messages.some((m) => m.channel === COMM_CHANNEL.EMAIL);
+  const hasNonEmail = thread.messages.some((m) => m.channel !== COMM_CHANNEL.EMAIL);
+  if (hasEmail && hasNonEmail) return 'mixed';
+  if (hasEmail) return 'email';
+  return 'app';
+}
+
+/** Project one contractor-facade message into the app's ThreadMessage shape. */
+function toThreadMessage(
+  m: ContractorMessageThread['messages'][number],
+): ThreadMessage {
+  return {
+    id: m.id,
+    at: m.at,
+    from: m.from,
+    fromRole: COMM_USER_TYPE_TO_ROLE[m.userType] ?? 'crossub',
+    body: m.body,
+    channel: COMM_CHANNEL_TO_MESSAGE[m.channel] ?? 'app',
+  };
+}
+
+/**
+ * Project one contractor-facade message thread onto the app's MessageThread view-model.
+ * The DTO carries clean `T | null` scalars; the view-model wants non-null display
+ * strings, so the address/last-message/last-at fall back to sensible blanks.
+ */
+export function toMessageThread(thread: ContractorMessageThread): MessageThread {
+  return {
+    id: thread.id,
+    jobId: asString(thread.jobId) ?? undefined,
+    jobTrackingNumber: asString(thread.jobTrackingNumber) ?? undefined,
+    propertyAddress: asString(thread.propertyAddress) ?? '—',
+    subject: thread.subject,
+    participants: thread.participants,
+    lastMessage: asString(thread.lastMessage) ?? '',
+    lastAt: asString(thread.lastAt) ?? '',
+    unread: thread.unread,
+    channel: threadChannel(thread),
+    messages: thread.messages.map(toThreadMessage),
+  };
+}
+
+/** Map the contractor's message threads onto the app's MessageThread view-models. */
+export function mapContractorMessageThreads(
+  threads: ContractorMessageThread[],
+): MessageThread[] {
+  return threads.map(toMessageThread);
 }

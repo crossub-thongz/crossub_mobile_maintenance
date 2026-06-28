@@ -8,6 +8,12 @@ export type ContractorQuote = components['schemas']['ContractorQuoteResponseDto'
 export type CompleteContractorJob = components['schemas']['CompleteContractorJobDto'];
 export type SubmitContractorQuote = components['schemas']['SubmitContractorQuoteDto'];
 export type AddContractorPhotos = components['schemas']['AddContractorPhotosDto'];
+export type ContractorMessageThread =
+  components['schemas']['ContractorMessageThreadResponseDto'];
+export type CreateContractorMessageThread =
+  components['schemas']['CreateContractorMessageThreadDto'];
+export type SendContractorMessage =
+  components['schemas']['SendContractorMessageDto'];
 
 /** Assigned maintenance jobs for the signed-in contractor (`GET /api/v1/contractor/jobs`). */
 export async function fetchJobs(): Promise<ContractorJob[]> {
@@ -57,5 +63,34 @@ export async function submitQuote(
     body,
   });
   if (error || !data) throw new Error('Failed to submit quote');
+  return data;
+}
+
+/** The signed-in contractor's message threads (`GET /api/v1/contractor/messages`). */
+export async function fetchMessages(): Promise<ContractorMessageThread[]> {
+  const { data, error } = await crossub.GET('/contractor/messages');
+  if (error || !data) throw new Error('Failed to load messages');
+  return data;
+}
+
+/** Open a new message thread (`POST /api/v1/contractor/messages`). */
+export async function createMessageThread(
+  body: CreateContractorMessageThread,
+): Promise<ContractorMessageThread> {
+  const { data, error } = await crossub.POST('/contractor/messages', { body });
+  if (error || !data) throw new Error('Failed to create message thread');
+  return data;
+}
+
+/** Reply to a thread (`POST /api/v1/contractor/messages/{threadId}/reply`). */
+export async function replyToThread(
+  threadId: string,
+  body: SendContractorMessage,
+): Promise<ContractorMessageThread> {
+  const { data, error } = await crossub.POST(
+    '/contractor/messages/{threadId}/reply',
+    { params: { path: { threadId } }, body },
+  );
+  if (error || !data) throw new Error('Failed to send reply');
   return data;
 }
