@@ -3,6 +3,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   REGISTER: '/register',
   VERIFICATION: '/verification',
+  SYSTEM_ACCESS_AGREEMENT: '/system-access-agreement',
   DASHBOARD: '/dashboard',
   JOBS: '/jobs',
   MESSAGES: '/messages',

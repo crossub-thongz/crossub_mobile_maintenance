@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { SystemAccessAgreementGate } from '@/components/auth/system-access-agreement-gate';
 import { ContractorDataProvider } from '@/components/providers/contractor-data-provider';
 import { ProviderErrorBoundary } from '@/components/providers/provider-error-boundary';
 import { Toaster } from '@/components/ui/sonner';
@@ -44,7 +45,9 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <AuthProvider>
           <ProviderErrorBoundary>
-            <ContractorDataProvider>{children}</ContractorDataProvider>
+            <SystemAccessAgreementGate>
+              <ContractorDataProvider>{children}</ContractorDataProvider>
+            </SystemAccessAgreementGate>
           </ProviderErrorBoundary>
         </AuthProvider>
         <Toaster position="bottom-right" />
