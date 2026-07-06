@@ -9,7 +9,7 @@
     "dev:raw": "pnpm -r --parallel run dev",
     "dev:maintenance": "pnpm --filter @crossub/maintenance dev",
     "build": "pnpm -r run build",
-    "build:maintenance": "pnpm --filter @crossub/maintenance build",
+    "build:maintenance": "pnpm --filter @crossub-thongz/api-contract build && pnpm --filter @crossub/maintenance build",
     "start": "pnpm -r --parallel run start",
     "start:maintenance": "pnpm --filter @crossub/maintenance start",
     "lint": "pnpm -r run lint"
