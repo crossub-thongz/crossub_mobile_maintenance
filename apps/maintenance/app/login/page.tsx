@@ -11,7 +11,6 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -38,17 +37,16 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
-  const router = useRouter();
   const { refresh, status, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (status === 'authed' && user) {
-      router.replace(
+      window.location.replace(
         postAuthDestination(user, ROUTES.DASHBOARD, ROUTES.SYSTEM_ACCESS_AGREEMENT),
       );
     }
-  }, [status, user, router]);
+  }, [status, user]);
 
   const {
     register,
@@ -62,8 +60,12 @@ export default function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     try {
       const result = await api.post<{ user: AuthUser }>('/auth/login', values);
+      if (!result?.user) {
+        toast.error('Sign in failed — unexpected API response.');
+        return;
+      }
       await refresh();
-      router.replace(
+      window.location.assign(
         postAuthDestination(
           result.user,
           ROUTES.DASHBOARD,

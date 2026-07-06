@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { readUpstreamSetCookies, rewriteBffSetCookie } from '@/lib/bff-cookie';
+
 const apiBase = (): string =>
   process.env.API_INTERNAL_URL ?? 'http://localhost:3001';
 
@@ -15,28 +17,36 @@ const buildUpstreamUrl = (req: NextRequest, path: string[]): string => {
   return `${apiBase()}/api/${suffix}${req.nextUrl.search}`;
 };
 
-const rewriteSetCookie = (cookie: string): string =>
-  cookie
-    .split(';')
-    .filter((part) => !part.trim().toLowerCase().startsWith('domain='))
-    .join(';');
-
 const proxy = async (
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ): Promise<NextResponse> => {
   const { path } = await context.params;
-  const upstream = await fetch(buildUpstreamUrl(req, path), {
-    method: req.method,
-    headers: forwardHeaders(req),
-    body:
-      req.method === 'GET' || req.method === 'HEAD'
-        ? undefined
-        : await req.arrayBuffer(),
-    redirect: 'manual',
-  });
 
-  const response = new NextResponse(upstream.body, {
+  let upstream: Response;
+  try {
+    upstream = await fetch(buildUpstreamUrl(req, path), {
+      method: req.method,
+      headers: forwardHeaders(req),
+      body:
+        req.method === 'GET' || req.method === 'HEAD'
+          ? undefined
+          : await req.arrayBuffer(),
+      redirect: 'manual',
+    });
+  } catch {
+    return NextResponse.json(
+      { message: 'API unavailable. Check API_INTERNAL_URL or start crossub_web.' },
+      { status: 503 },
+    );
+  }
+
+  const responseBody =
+    upstream.status === 204 || req.method === 'HEAD'
+      ? null
+      : await upstream.arrayBuffer();
+
+  const response = new NextResponse(responseBody, {
     status: upstream.status,
     statusText: upstream.statusText,
   });
@@ -45,12 +55,15 @@ const proxy = async (
     const lower = key.toLowerCase();
     if (lower === 'set-cookie') return;
     if (lower === 'transfer-encoding') return;
+    // fetch() decompresses gzip/br bodies; forwarding content-encoding breaks browsers.
+    if (lower === 'content-encoding') return;
+    if (lower === 'content-length') return;
     response.headers.set(key, value);
   });
 
-  const cookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of cookies) {
-    response.headers.append('set-cookie', rewriteSetCookie(cookie));
+  const requestHost = req.headers.get('host') ?? '';
+  for (const cookie of readUpstreamSetCookies(upstream.headers)) {
+    response.headers.append('set-cookie', rewriteBffSetCookie(cookie, requestHost));
   }
 
   return response;
