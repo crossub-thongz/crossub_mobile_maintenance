@@ -35,10 +35,6 @@ import {
 import { fileToBase64 } from '@/lib/utils';
 import {
   countByBucket,
-  DEMO_JOBS,
-  DEMO_MESSAGES,
-  DEMO_NOTIFICATIONS,
-  DEMO_PROFILE,
 } from '@/lib/mock-data';
 import type {
   ContractorNotification,
@@ -87,12 +83,26 @@ const ContractorDataContext = createContext<ContractorDataContextValue | undefin
   undefined,
 );
 
+const EMPTY_PROFILE: ContractorProfile = {
+  id: '',
+  companyName: '',
+  abn: '',
+  contactPerson: '',
+  mobile: '',
+  email: '',
+  businessAddress: '',
+  tradeCategory: '',
+  licenceNumber: '',
+  licenceExpiry: '',
+  verificationStatus: 'pending',
+  bankDetailsOnFile: false,
+};
+
 export function ContractorDataProvider({ children }: { children: React.ReactNode }) {
   const store = useContractorStore();
   const [jobsFromApi, setJobsFromApi] = useState<MaintenanceJob[]>([]);
-  const [messages, setMessages] = useState<MessageThread[]>(DEMO_MESSAGES);
-  const [notifications, setNotifications] =
-    useState<ContractorNotification[]>(DEMO_NOTIFICATIONS);
+  const [messages, setMessages] = useState<MessageThread[]>([]);
+  const [notifications, setNotifications] = useState<ContractorNotification[]>([]);
   const [apiConnected, setApiConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,18 +127,18 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
       setApiError(null);
     } else {
       setApiConnected(false);
-      setApiError('Unable to reach CROSSUB API — showing demo data');
+      setApiError('Unable to reach CROSSUB API');
       setJobsFromApi([]);
     }
     setMessages(
       messagesRes.status === 'fulfilled'
         ? mapContractorMessageThreads(messagesRes.value)
-        : DEMO_MESSAGES,
+        : [],
     );
     setNotifications(
       notificationsRes.status === 'fulfilled'
         ? mapContractorNotifications(notificationsRes.value)
-        : DEMO_NOTIFICATIONS,
+        : [],
     );
     setLoading(false);
   }, []);
@@ -142,9 +152,8 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   // unreachable) so the board never blanks; the apiError banner makes that state explicit
   // (mirrors how messages/notifications replace, not merge, their live data).
   const mergedJobs = useMemo(() => {
-    const base = apiConnected ? jobsFromApi : DEMO_JOBS;
-    return applyLocalJobUpdates(base, store);
-  }, [apiConnected, jobsFromApi, store]);
+    return applyLocalJobUpdates(jobsFromApi, store);
+  }, [jobsFromApi, store]);
 
   const dashboardCards = useMemo(() => countByBucket(mergedJobs), [mergedJobs]);
 
@@ -380,7 +389,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   }, [apiConnected]);
 
   const value: ContractorDataContextValue = {
-    profile: DEMO_PROFILE,
+    profile: EMPTY_PROFILE,
     jobs: mergedJobs,
     jobsFromApi,
     messages,
