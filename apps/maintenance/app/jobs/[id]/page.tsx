@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Calendar, FileText, Phone, Upload } from 'lucide-react';
+import { Calendar, Camera, FileText, Phone, Upload } from 'lucide-react';
 
 import { DataSourceBadge } from '@/components/contractor/connection-banner';
 import { PriorityBadge, StatusBadge } from '@/components/contractor/status-badge';
@@ -26,27 +26,69 @@ import { formatCurrency, formatDateTime } from '@/lib/utils';
 export default function JobDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { jobs, acceptJob, declineJob } = useContractorData();
+  const { jobs, acceptRfq, declineJob, requestMorePhotos, submitScheduleAvailability } =
+    useContractorData();
   const [showDecline, setShowDecline] = useState(false);
+  const [showPhotoRequest, setShowPhotoRequest] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+  const [photoRequestMessage, setPhotoRequestMessage] = useState('');
+  const [scheduleTimes, setScheduleTimes] = useState('');
+  const [rfqBusy, setRfqBusy] = useState(false);
 
   const job = jobs.find((j) => j.id === id);
   if (!job) notFound();
 
-  const handleAccept = () => {
-    acceptJob(job.id);
-    toast.success('Job accepted — proceed to quote or schedule');
+  const handleAcceptRfq = async () => {
+    setRfqBusy(true);
+    try {
+      await acceptRfq(job.id);
+      toast.success('RFQ accepted — you can submit your quotation');
+    } catch {
+      toast.error('Could not accept — try again');
+    } finally {
+      setRfqBusy(false);
+    }
   };
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
     if (!declineReason) {
       toast.error('Select a decline reason');
       return;
     }
-    declineJob(job.id, declineReason);
-    toast.success('Job declined — returned for reassignment');
-    setShowDecline(false);
+    setRfqBusy(true);
+    try {
+      await declineJob(job.id, declineReason);
+      toast.success('RFQ declined — agent has been notified');
+      setShowDecline(false);
+    } catch {
+      toast.error('Could not decline — try again');
+    } finally {
+      setRfqBusy(false);
+    }
   };
+
+  const handleRequestPhotos = async () => {
+    if (!photoRequestMessage.trim()) {
+      toast.error('Describe what photos or details you need');
+      return;
+    }
+    setRfqBusy(true);
+    try {
+      await requestMorePhotos(job.id, photoRequestMessage.trim());
+      toast.success('Photo request sent to agent');
+      setShowPhotoRequest(false);
+      setPhotoRequestMessage('');
+    } catch {
+      toast.error('Could not send request — try again');
+    } finally {
+      setRfqBusy(false);
+    }
+  };
+
+  const rfqAccepted =
+    job.contractorResponse === 'accepted' ||
+    job.status === 'accepted' ||
+    Boolean(job.quotation);
 
   return (
     <ContractorShell title={job.trackingNumber} backHref={ROUTES.JOBS}>
@@ -79,18 +121,60 @@ export default function JobDetailPage() {
           <ContactCard label="Agent" contact={job.agent} />
         </section>
 
-        {job.status === 'assigned' && (
+        {job.status === 'assigned' && job.status !== 'declined' && (
           <div className="space-y-2">
-            {!showDecline ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="lg" onClick={handleAccept}>
-                  Accept job
-                </Button>
-                <Button size="lg" variant="outline" onClick={() => setShowDecline(true)}>
-                  Decline
-                </Button>
-              </div>
-            ) : (
+            {!rfqAccepted ? (
+              <>
+                <p className="text-muted-foreground text-xs">
+                  Review the job details, then accept to quote, decline, or request more photos.
+                </p>
+                {!showDecline && !showPhotoRequest ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <Button size="lg" disabled={rfqBusy} onClick={() => void handleAcceptRfq()}>
+                      Accept &amp; quote
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      disabled={rfqBusy}
+                      onClick={() => setShowPhotoRequest(true)}
+                    >
+                      <Camera className="size-4" />
+                      Request photos
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      disabled={rfqBusy}
+                      onClick={() => setShowDecline(true)}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                ) : null}
+                {showPhotoRequest ? (
+                  <div className="space-y-2 rounded-xl border bg-card p-4">
+                    <p className="text-sm font-medium">Request more pictures</p>
+                    <textarea
+                      className="border-input bg-background flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
+                      placeholder="Describe what photos or details you need before quoting…"
+                      value={photoRequestMessage}
+                      onChange={(e) => setPhotoRequestMessage(e.target.value)}
+                      rows={4}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button disabled={rfqBusy} onClick={() => void handleRequestPhotos()}>
+                        Send request
+                      </Button>
+                      <Button variant="ghost" onClick={() => setShowPhotoRequest(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            {showDecline ? (
               <div className="space-y-2 rounded-xl border bg-card p-4">
                 <p className="text-sm font-medium">Decline reason</p>
                 <select
@@ -106,7 +190,7 @@ export default function JobDetailPage() {
                   ))}
                 </select>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="destructive" onClick={handleDecline}>
+                  <Button variant="destructive" disabled={rfqBusy} onClick={() => void handleDecline()}>
                     Confirm decline
                   </Button>
                   <Button variant="ghost" onClick={() => setShowDecline(false)}>
@@ -114,13 +198,13 @@ export default function JobDetailPage() {
                   </Button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
-        {(job.status === 'accepted' ||
-          job.status === 'approved' ||
-          (job.contractorResponse === 'accepted' && !job.quotation)) && (
+        {rfqAccepted &&
+          !job.quotation &&
+          job.status !== 'declined' && (
           <Button asChild className="w-full" size="lg">
             <Link href={jobQuote(job.id)}>
               <FileText className="size-4" />
@@ -140,6 +224,41 @@ export default function JobDetailPage() {
               <StatusBadge status={job.quotation.status} />
             </CardContent>
           </Card>
+        )}
+
+        {job.quotation && job.status !== 'declined' && job.status !== 'closed' && (
+          <div className="space-y-2 rounded-xl border bg-card p-4">
+            <p className="text-sm font-semibold">Schedule visit</p>
+            <p className="text-muted-foreground text-xs">
+              After your quote is approved, contact the tenant and submit your available visit
+              times for them to confirm.
+            </p>
+            <textarea
+              className="border-input bg-background flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
+              placeholder="e.g. Mon 10 Mar 9–11am, Tue 11 Mar 2–4pm"
+              value={scheduleTimes}
+              onChange={(e) => setScheduleTimes(e.target.value)}
+              rows={3}
+            />
+            <Button
+              className="w-full"
+              disabled={rfqBusy || !scheduleTimes.trim()}
+              onClick={async () => {
+                setRfqBusy(true);
+                try {
+                  await submitScheduleAvailability(job.id, scheduleTimes);
+                  toast.success('Visit times sent to tenant for approval');
+                  setScheduleTimes('');
+                } catch {
+                  toast.error('Could not submit — ensure your quote is approved first');
+                } finally {
+                  setRfqBusy(false);
+                }
+              }}
+            >
+              Submit availability
+            </Button>
+          </div>
         )}
 
         {(job.status === 'approved' || job.status === 'in_progress') && (

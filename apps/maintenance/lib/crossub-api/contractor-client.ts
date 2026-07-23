@@ -103,6 +103,28 @@ export async function uploadJobPhoto(
   return data;
 }
 
+/** Upload contractor invoice file (PDF/image) (`POST /api/v1/contractor/jobs/{jobId}/invoice/upload`). */
+export async function uploadInvoiceFile(
+  jobId: string,
+  body: {
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    contentBase64: string;
+  },
+): Promise<void> {
+  const res = await fetch(`/api/contractor/jobs/${jobId}/invoice/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || 'Failed to upload invoice file');
+  }
+}
+
 /** The signed-in contractor's message threads (`GET /api/v1/contractor/messages`). */
 export async function fetchMessages(): Promise<ContractorMessageThread[]> {
   const { data, error } = await crossub.GET('/contractor/messages');
@@ -156,4 +178,60 @@ export async function markAllNotificationsRead(): Promise<ContractorNotification
   const { data, error } = await crossub.POST('/contractor/notifications/read-all');
   if (error || !data) throw new Error('Failed to mark all notifications read');
   return data;
+}
+
+const CONTRACTOR_API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/v1`;
+
+async function contractorRfqPost<T>(
+  jobId: string,
+  action: 'accept' | 'decline' | 'request-photos',
+  body?: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(`${CONTRACTOR_API_BASE}/contractor/jobs/${jobId}/rfq/${action}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`RFQ ${action} failed`);
+  return res.json() as Promise<T>;
+}
+
+/** Acknowledge RFQ invite — proceed to quote (`POST …/rfq/accept`). */
+export async function acceptRfq(jobId: string): Promise<ContractorJob> {
+  return contractorRfqPost<ContractorJob>(jobId, 'accept');
+}
+
+/** Decline RFQ before quoting (`POST …/rfq/decline`). */
+export async function declineRfq(
+  jobId: string,
+  body: { reason: string },
+): Promise<ContractorJob> {
+  return contractorRfqPost<ContractorJob>(jobId, 'decline', body);
+}
+
+/** Request additional photos before quoting (`POST …/rfq/request-photos`). */
+export async function requestRfqPhotos(
+  jobId: string,
+  body: { message: string },
+): Promise<ContractorJob> {
+  return contractorRfqPost<ContractorJob>(jobId, 'request-photos', body);
+}
+
+/** Submit visit availability for tenant approval (`POST …/schedule/availability`). */
+export async function submitScheduleAvailability(
+  jobId: string,
+  body: { availableTimes: string },
+): Promise<ContractorJob> {
+  const res = await fetch(
+    `${CONTRACTOR_API_BASE}/contractor/jobs/${jobId}/schedule/availability`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error('Schedule availability submit failed');
+  return res.json() as Promise<ContractorJob>;
 }

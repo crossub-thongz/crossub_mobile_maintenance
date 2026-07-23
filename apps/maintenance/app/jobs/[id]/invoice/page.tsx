@@ -2,6 +2,7 @@
 
 import { notFound, useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ContractorShell } from '@/components/layout/contractor-shell';
@@ -18,6 +19,7 @@ export default function InvoicePage() {
   const id = params.id as string;
   const { jobs, submitInvoice } = useContractorData();
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const job = jobs.find((j) => j.id === id);
@@ -30,13 +32,18 @@ export default function InvoicePage() {
       toast.error('Enter invoice number');
       return;
     }
+    if (!invoiceFile) {
+      toast.error('Upload the invoice PDF or image');
+      return;
+    }
     setSubmitting(true);
     try {
       await submitInvoice(job.id, {
         invoiceNumber: invoiceNumber.trim(),
         invoiceAmount: amount,
+        invoiceFile,
       });
-      toast.success('Invoice submitted to Agent / Accounting');
+      toast.success('Invoice submitted — agent will be notified');
       router.push(jobDetail(job.id));
     } catch {
       toast.error('Failed to submit invoice');
@@ -64,14 +71,28 @@ export default function InvoicePage() {
           />
         </div>
 
+        <div className="space-y-2">
+          <Label>Invoice file (PDF or image)</Label>
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed p-6 transition-colors hover:border-primary/50 hover:bg-primary/5">
+            <Upload className="text-muted-foreground mb-2 size-7" />
+            <span className="text-sm font-medium">Tap to upload invoice</span>
+            <span className="text-muted-foreground text-xs">PDF or photo required</span>
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          {invoiceFile ? (
+            <p className="text-primary text-xs">{invoiceFile.name}</p>
+          ) : null}
+        </div>
+
         <dl className="space-y-2 rounded-xl border bg-card p-4 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Work description</dt>
             <dd className="text-right font-medium">{job.quotation?.scope.slice(0, 40)}...</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted-foreground">GST</dt>
-            <dd className="font-medium">Included</dd>
           </div>
           <div className="flex justify-between border-t border-border pt-2">
             <dt className="font-medium">Total</dt>
@@ -80,8 +101,8 @@ export default function InvoicePage() {
         </dl>
 
         <p className="text-muted-foreground text-xs">
-          Invoice PDF is generated automatically for audit. Payment tracking updates
-          when Accounting processes the payment.
+          After both completion photos and this invoice are uploaded, the managing agent
+          receives an email and can review the invoice in the agent portal.
         </p>
 
         <Button

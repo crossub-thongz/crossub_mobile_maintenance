@@ -11,11 +11,16 @@ import {
 
 import {
   acceptJob as apiAcceptJob,
+  acceptRfq as apiAcceptRfq,
+  declineRfq as apiDeclineRfq,
+  requestRfqPhotos as apiRequestRfqPhotos,
+  submitScheduleAvailability as apiSubmitScheduleAvailability,
   completeJob as apiCompleteJob,
   markAllNotificationsRead as apiMarkAllNotificationsRead,
   markNotificationRead as apiMarkNotificationRead,
   replyToThread as apiReplyToThread,
   submitInvoice as apiSubmitInvoice,
+  uploadInvoiceFile as apiUploadInvoiceFile,
   submitQuote as apiSubmitQuote,
   uploadJobPhoto as apiUploadJobPhoto,
   fetchJobs,
@@ -56,7 +61,10 @@ interface ContractorDataContextValue {
   loading: boolean;
   refresh: () => Promise<void>;
   acceptJob: (id: string) => void;
-  declineJob: (id: string, reason: string) => void;
+  acceptRfq: (id: string) => Promise<void>;
+  declineJob: (id: string, reason: string) => Promise<void>;
+  requestMorePhotos: (id: string, message: string) => Promise<void>;
+  submitScheduleAvailability: (id: string, availableTimes: string) => Promise<void>;
   submitQuotation: (
     jobId: string,
     data: {
@@ -72,7 +80,7 @@ interface ContractorDataContextValue {
   markComplete: (jobId: string) => Promise<void>;
   submitInvoice: (
     jobId: string,
-    data: { invoiceNumber: string; invoiceAmount?: number },
+    data: { invoiceNumber: string; invoiceAmount?: number; invoiceFile?: File },
   ) => Promise<void>;
   sendThreadReply: (threadId: string, body: string) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
@@ -172,11 +180,60 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [apiConnected, refresh, store],
   );
 
-  const declineJob = useCallback(
-    (id: string, reason: string) => {
-      store.declineJob(id, reason);
+  const acceptRfq = useCallback(
+    async (id: string) => {
+      store.updateJob(id, { contractorResponse: 'accepted' });
+      if (apiConnected) {
+        try {
+          await apiAcceptRfq(id);
+          await refresh();
+        } catch {
+          // keep optimistic state
+        }
+      }
     },
-    [store],
+    [apiConnected, refresh, store],
+  );
+
+  const declineJob = useCallback(
+    async (id: string, reason: string) => {
+      store.declineJob(id, reason);
+      if (apiConnected) {
+        try {
+          await apiDeclineRfq(id, { reason });
+          await refresh();
+        } catch {
+          // keep local decline overlay
+        }
+      }
+    },
+    [apiConnected, refresh, store],
+  );
+
+  const requestMorePhotos = useCallback(
+    async (id: string, message: string) => {
+      if (!message.trim()) return;
+      if (apiConnected) {
+        try {
+          await apiRequestRfqPhotos(id, { message: message.trim() });
+          await refresh();
+        } catch {
+          // no-op
+        }
+      }
+    },
+    [apiConnected, refresh],
+  );
+
+  const submitScheduleAvailability = useCallback(
+    async (id: string, availableTimes: string) => {
+      if (!availableTimes.trim()) return;
+      if (apiConnected) {
+        await apiSubmitScheduleAvailability(id, { availableTimes: availableTimes.trim() });
+        await refresh();
+      }
+    },
+    [apiConnected, refresh],
   );
 
   // Quote submission persists a real MaintenanceQuote via the facade
@@ -289,7 +346,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   const submitInvoice = useCallback(
     async (
       jobId: string,
-      data: { invoiceNumber: string; invoiceAmount?: number },
+      data: { invoiceNumber: string; invoiceAmount?: number; invoiceFile?: File },
     ) => {
       if (apiConnected) {
         try {
@@ -297,6 +354,16 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
             invoiceNumber: data.invoiceNumber,
             invoiceAmount: data.invoiceAmount,
           });
+          if (data.invoiceFile) {
+            const mime = data.invoiceFile.type || 'application/pdf';
+            const contentBase64 = await fileToBase64(data.invoiceFile);
+            await apiUploadInvoiceFile(jobId, {
+              fileName: data.invoiceFile.name,
+              mimeType: mime,
+              sizeBytes: data.invoiceFile.size,
+              contentBase64,
+            });
+          }
           await refresh();
           return;
         } catch {
@@ -400,7 +467,10 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     loading,
     refresh,
     acceptJob,
+    acceptRfq,
     declineJob,
+    requestMorePhotos,
+    submitScheduleAvailability,
     submitQuotation,
     uploadJobPhotos,
     markComplete,
