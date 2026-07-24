@@ -37,6 +37,11 @@ import {
   applyLocalJobUpdates,
   useContractorStore,
 } from '@/lib/store';
+import {
+  peekContractorPhotoUploads,
+  queueContractorPhotoUploads,
+  removeContractorPhotoUpload,
+} from '@/lib/contractor-pending-photo-uploads';
 import { fileToBase64 } from '@/lib/utils';
 import {
   countByBucket,
@@ -154,6 +159,30 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!apiConnected) return;
+    void (async () => {
+      const queued = await peekContractorPhotoUploads();
+      if (!queued.length) return;
+      for (const record of queued) {
+        try {
+          const file = new File([record.blob], record.fileName, { type: record.mimeType });
+          const contentBase64 = await fileToBase64(file);
+          await apiUploadJobPhoto(record.jobId, {
+            fileName: record.fileName,
+            mimeType: record.mimeType,
+            sizeBytes: record.blob.size,
+            contentBase64,
+          });
+          await removeContractorPhotoUpload(record.id);
+        } catch {
+          // Keep failed rows for the next reconnect attempt.
+        }
+      }
+      await refresh();
+    })();
+  }, [apiConnected, refresh]);
 
   // When live, the board shows ONLY the contractor's real API jobs — no demo seeds
   // blended in. The demo seeds are used solely as an offline fallback (when the API is
@@ -295,13 +324,23 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
     [apiConnected, refresh, store],
   );
 
-  // Upload completion/evidence photos for real: each File is read as base64 and pushed
-  // through the facade (`POST /contractor/jobs/:id/photos/upload`), which stores it in R2
-  // and appends the URL to the job's result photos. Offline (no live API) this is a no-op
-  // — the demo board has no server to upload to, matching the old mock-upload behaviour.
+  // Upload completion/evidence photos: online posts to the API; offline queues in IndexedDB
+  // and flushes when the API reconnects.
   const uploadJobPhotos = useCallback(
     async (jobId: string, files: File[]) => {
-      if (!apiConnected || files.length === 0) return;
+      if (files.length === 0) return;
+      if (!apiConnected) {
+        await queueContractorPhotoUploads(
+          files.map((file, index) => ({
+            id: `photo-${jobId}-${Date.now()}-${index}`,
+            jobId,
+            fileName: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            blob: file,
+          })),
+        );
+        return;
+      }
       for (const file of files) {
         const contentBase64 = await fileToBase64(file);
         await apiUploadJobPhoto(jobId, {
