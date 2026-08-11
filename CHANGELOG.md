@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-11
+
+### Fixed
+- **"Send reset link" did nothing at all.** `/forgot-password` rendered a complete, convincing form — email field, submit button — wired to `onSubmit={(e) => e.preventDefault()}`. No request, no toast, no error, no navigation. A contractor typed their address, tapped the button, and the page sat there. That is a worse failure than the dead-end paragraph the tenant app shipped alongside it: there the reader got a sentence to argue with, and five of them screenshotted it and emailed support. Here nothing happens, which reads as a slow network rather than a broken screen, so it would be tapped repeatedly and never reported. The page now posts to `POST /api/auth/forgot-password`, which was public and already correct the whole time — including for an account that has never been used, since `AuthService.forgotPassword` re-sends a fresh SETUP link to a PENDING_INVITE user rather than staying silent. That case is the common one here: a contractor's login is provisioned for them, so they never chose a password and "forgot" is the wrong mental model. No `/reset-password` route was added — the emailed link lands on crossub_web's public reset page, which stays the one place a password is set. The confirmation names no expiry, because a setup link (72h) and a reset (24h) differ and naming either would leak which one the reader was sent.
+- **The sign-in form no longer rejects a correct password before sending it.** `schema` enforced `.min(PASSWORD_MIN)` — 10 characters — on the *login* field, so an account whose password predates the policy greyed out with "Min 10 characters" under credentials that were perfectly valid, in the browser, without the API ever seeing the attempt. It matters more here than anywhere: a contractor's password is handed to them rather than chosen, so a short one is exactly what this form would have refused to send. `LoginDto` dropped this exact rule on 10 Aug 2026 after it locked out 23 of the 43 migrated agent logins, and `login-dto-validation.spec.ts` pins it there; the agent app's copy went with it and the other four were missed. `.max(PASSWORD_MAX)` stays, as a cost guard on what reaches Argon2.
+
+Both are **preventive rather than urgent: production carries 0 CONTRACTOR accounts today.** They are the two things that would have broken on the first day contractors were onboarded, silently and at once.
+
 ## 2026-06-28
 
 ### Added
