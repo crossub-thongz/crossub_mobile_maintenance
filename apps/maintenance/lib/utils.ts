@@ -1,6 +1,26 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import {
+  dayKey,
+  formatDate,
+  formatDateMedium,
+  formatDateTime,
+  formatDateTimeMedium,
+  formatTime,
+  formatTimeShort,
+} from '@/lib/format-datetime';
+
+export {
+  dayKey,
+  formatDate,
+  formatDateMedium,
+  formatDateTime,
+  formatDateTimeMedium,
+  formatTime,
+  formatTimeShort,
+};
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -12,24 +32,6 @@ export function displayName(user: {
 }): string {
   const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
   return name || user.email;
-}
-
-export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-AU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-AU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 export function formatRelative(iso: string): string {
