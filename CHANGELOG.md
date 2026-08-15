@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-15
+
+### Changed
+- **The vendored API contract moved 0.11.0 → 0.14.0, and it turned out the app was not reading the vendored copy at all.** `apps/maintenance/package.json` asks for `workspace:*` and `pnpm-lock.yaml` records `link:../../packages/api-contract`, but the installed symlink pointed at `node_modules/.pnpm/@crossub-thongz+api-contract@0.9.0` — **a registry tarball from 28 June**, two versions *behind* even the stale local copy. So the types this app was checked against came from a package nobody had touched in seven weeks, while `packages/api-contract` sat beside it unread. `node_modules` had never caught up when the dependency became a workspace link.
+
+  Reinstalling repointed the link; the vendored files were then synced from `crossub_web` and the version set to 0.14.0.
+
+  **No regression: type errors are 5 before and 5 after**, and all five are app-internal — two `Headers.getAll` calls that no longer exist in the DOM lib, a status comparison between `"assigned"` and `"declined"`, and two literals in the contractor provider's seed data that are not members of their own unions. None touch a contract DTO. That is a genuinely better outcome than the same fix produced in the tenant app, where it took 92 errors down to 11: this app's typed usage happened to stay compatible across five versions of drift.
+
+  Render is unaffected: `buildCommand` runs `build:maintenance`, which already builds the contract package before the app, so the gitignored `dist/` the workspace link needs is produced on every deploy. `GITHUB_TOKEN` is not needed for a `link:` dependency either — the local install warned that it was missing and resolved fine.
+
+  **Known and not fixed here: 26 of the 311 schemas in this contract are empty** — `{"type":"object","properties":{}}` — because those DTOs carry `class-validator` decorators but no `@ApiProperty()`, so Swagger sees no fields. `LoginDto` is one of them. Any typed client sending those bodies gets `Type 'string' is not assignable to type 'never'`. API-side fix and a re-publish.
+
 ## 2026-08-11
 
 ### Fixed
