@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { StripEmojisGuard } from '@/components/providers/strip-emojis-guard';
 import { SystemAccessAgreementGate } from '@/components/auth/system-access-agreement-gate';
 import { ContractorDataProvider } from '@/components/providers/contractor-data-provider';
 import { ProviderErrorBoundary } from '@/components/providers/provider-error-boundary';
@@ -44,6 +45,7 @@ export default function RootLayout({
     <html lang="en" className="dark bg-background">
       <body className={`${inter.variable} font-sans antialiased`}>
         <AuthProvider>
+          <StripEmojisGuard />
           <ProviderErrorBoundary>
             <SystemAccessAgreementGate>
               <ContractorDataProvider>{children}</ContractorDataProvider>

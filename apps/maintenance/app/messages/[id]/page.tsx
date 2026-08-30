@@ -7,6 +7,7 @@ import { notFound, useParams } from 'next/navigation';
 import { ContractorShell } from '@/components/layout/contractor-shell';
 import { useContractorData } from '@/components/providers/contractor-data-provider';
 import { ROUTES } from '@/constants/routes';
+import { stripEmojis } from '@/lib/strip-emojis';
 import { formatDateTime } from '@/lib/utils';
 
 export default function MessageDetailPage() {
@@ -75,7 +76,7 @@ export default function MessageDetailPage() {
             <input
               type="text"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => setDraft(stripEmojis(e.target.value))}
               placeholder="Type a message..."
               className="flex-1 bg-transparent px-2 text-sm outline-none"
             />

@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useContractorData } from '@/components/providers/contractor-data-provider';
 import { jobDetail } from '@/constants/routes';
 import { formatCurrency } from '@/lib/utils';
+import { stripEmojis } from '@/lib/strip-emojis';
 
 const schema = z.object({
   scope: z.string().min(10, 'Describe the scope of works'),
@@ -76,7 +77,7 @@ export default function QuotePage() {
             id="scope"
             className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             placeholder="Scope of repair work..."
-            {...register('scope')}
+            {...register('scope', { setValueAs: (value) => stripEmojis(String(value ?? '')) })}
           />
           {errors.scope && (
             <p className="text-xs text-destructive">{errors.scope.message}</p>

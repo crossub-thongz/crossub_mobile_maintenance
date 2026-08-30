@@ -22,6 +22,7 @@ import {
   ROUTES,
 } from '@/constants/routes';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { stripEmojis } from '@/lib/strip-emojis';
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -159,7 +160,7 @@ export default function JobDetailPage() {
                       className="border-input bg-background flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
                       placeholder="Describe what photos or details you need before quoting…"
                       value={photoRequestMessage}
-                      onChange={(e) => setPhotoRequestMessage(e.target.value)}
+                      onChange={(e) => setPhotoRequestMessage(stripEmojis(e.target.value))}
                       rows={4}
                     />
                     <div className="grid grid-cols-2 gap-2">
@@ -237,7 +238,7 @@ export default function JobDetailPage() {
               className="border-input bg-background flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
               placeholder="e.g. Mon 10 Mar 9–11am, Tue 11 Mar 2–4pm"
               value={scheduleTimes}
-              onChange={(e) => setScheduleTimes(e.target.value)}
+              onChange={(e) => setScheduleTimes(stripEmojis(e.target.value))}
               rows={3}
             />
             <Button

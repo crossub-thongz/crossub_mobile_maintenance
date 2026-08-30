@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useContractorData } from '@/components/providers/contractor-data-provider';
 import { jobDetail } from '@/constants/routes';
+import { stripEmojis } from '@/lib/strip-emojis';
 
 export default function CompletePage() {
   const params = useParams();
@@ -86,7 +87,7 @@ export default function CompletePage() {
             id="notes"
             className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => setNotes(stripEmojis(e.target.value))}
             placeholder="Work completed, any unresolved issues..."
           />
         </div>
