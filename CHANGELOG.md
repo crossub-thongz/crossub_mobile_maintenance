@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-14
+
+### Changed
+- **Re-vendored `@crossub-thongz/api-contract` 0.17.0 → 0.21.0: 266 → 278 paths, 348 → 366 schemas.** 0.21.0 is the release that carries the maintenance AI redesign (issue questions and tenant answers, AI quote-review flags, and a `purpose` on quotes so a diagnostic call-out can be told apart from a repair quote) plus three weeks of facade growth since 0.17.0. 0 of the new paths are on the contractor facade. `packages/api-contract/dist` was rebuilt so the compiler reads the new types, and `tsc --noEmit` on `apps/maintenance` returns the identical 6 app-internal errors as before. The app's own `TRADE_CATEGORIES` already lists Handyman, so nothing else changes here.
+
 ## 2026-08-26
 
 ### Changed
