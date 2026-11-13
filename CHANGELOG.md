@@ -3,11 +3,23 @@
 ## 2026-11-13
 
 ### Added
+- `pnpm verify` (production build with type check) and `pnpm typecheck`
+- `.github/workflows/ci.yml`: runs `pnpm verify` on every pull request
 - `.github/pull_request_template.md`: pull request checklist (real data only, no loosened checks, every behaviour change listed, AI tool use)
 - `.github/CODEOWNERS`: list of guard files (rules files, contract client, CI, lint and type settings) whose changes need senior developer review
 - `AGENTS.md`: rules file for AI coding tools, ten shared rules identical across all CROSSUB repos plus this repo's notes
 - `.cursor/rules/shared-rules.mdc`: pointer so Cursor reads `AGENTS.md`
 
+### Fixed
+- Type errors 6 to 0
+
+### Changed
+- Profile and Verification pages say profile details are not available instead of showing blank fields; Verification page no longer crashes (the app never loaded a profile: the API has no contractor profile route)
+- Header shows the signed-in name without a leading separator when there is no company name
+- Build now fails on a type error: `typescript.ignoreBuildErrors` removed from `next.config.mjs`
+
+### Removed
+- Placeholder contractor profile with empty and invalid values
 
 ## 2026-09-18
 

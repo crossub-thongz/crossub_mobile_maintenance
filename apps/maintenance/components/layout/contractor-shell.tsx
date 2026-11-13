@@ -110,7 +110,8 @@ export function ContractorShell({
             <h1 className="truncate text-base font-semibold">{title}</h1>
             {user && (
               <p className="text-muted-foreground truncate text-xs">
-                {profile.companyName} · {displayName(user)}
+                {profile ? `${profile.companyName} · ` : ''}
+                {displayName(user)}
               </p>
             )}
           </div>

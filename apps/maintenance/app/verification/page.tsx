@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
 
+import { ProfileUnavailable } from '@/components/contractor/profile-unavailable';
 import { ContractorShell } from '@/components/layout/contractor-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,6 +40,15 @@ const STATUS_CONFIG = {
 
 export default function VerificationPage() {
   const { profile } = useContractorData();
+
+  if (!profile) {
+    return (
+      <ContractorShell title="Verification status" backHref={ROUTES.PROFILE}>
+        <ProfileUnavailable />
+      </ContractorShell>
+    );
+  }
+
   const config = STATUS_CONFIG[profile.verificationStatus];
   const Icon = config.icon;
 
