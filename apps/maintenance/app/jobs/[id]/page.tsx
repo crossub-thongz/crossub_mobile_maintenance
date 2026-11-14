@@ -122,7 +122,7 @@ export default function JobDetailPage() {
           <ContactCard label="Agent" contact={job.agent} />
         </section>
 
-        {job.status === 'assigned' && job.status !== 'declined' && (
+        {job.status === 'assigned' && (
           <div className="space-y-2">
             {!rfqAccepted ? (
               <>

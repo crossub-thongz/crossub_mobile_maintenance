@@ -55,7 +55,8 @@ import type {
 } from '@/lib/types';
 
 interface ContractorDataContextValue {
-  profile: ContractorProfile;
+  /** The contractor's company profile. `null`: the API has no profile endpoint for this app yet. */
+  profile: ContractorProfile | null;
   jobs: MaintenanceJob[];
   jobsFromApi: MaintenanceJob[];
   messages: MessageThread[];
@@ -95,21 +96,6 @@ interface ContractorDataContextValue {
 const ContractorDataContext = createContext<ContractorDataContextValue | undefined>(
   undefined,
 );
-
-const EMPTY_PROFILE: ContractorProfile = {
-  id: '',
-  companyName: '',
-  abn: '',
-  contactPerson: '',
-  mobile: '',
-  email: '',
-  businessAddress: '',
-  tradeCategory: '',
-  licenceNumber: '',
-  licenceExpiry: '',
-  verificationStatus: 'pending',
-  bankDetailsOnFile: false,
-};
 
 export function ContractorDataProvider({ children }: { children: React.ReactNode }) {
   const store = useContractorStore();
@@ -495,7 +481,7 @@ export function ContractorDataProvider({ children }: { children: React.ReactNode
   }, [apiConnected]);
 
   const value: ContractorDataContextValue = {
-    profile: EMPTY_PROFILE,
+    profile: null,
     jobs: mergedJobs,
     jobsFromApi,
     messages,

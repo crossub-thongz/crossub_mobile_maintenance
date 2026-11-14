@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Shield, Upload } from 'lucide-react';
 
+import { ProfileUnavailable } from '@/components/contractor/profile-unavailable';
 import { ContractorShell } from '@/components/layout/contractor-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +12,14 @@ import { ROUTES } from '@/constants/routes';
 
 export default function ProfilePage() {
   const { profile } = useContractorData();
+
+  if (!profile) {
+    return (
+      <ContractorShell title="Profile & licence">
+        <ProfileUnavailable />
+      </ContractorShell>
+    );
+  }
 
   return (
     <ContractorShell title="Profile & licence">

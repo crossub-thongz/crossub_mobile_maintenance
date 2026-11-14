@@ -26,7 +26,7 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-muted-foreground text-xs uppercase">Welcome back</p>
-          <p className="text-lg font-semibold">{profile.companyName}</p>
+          {profile && <p className="text-lg font-semibold">{profile.companyName}</p>}
           <p className="text-muted-foreground text-sm">
             Receive Job → Accept → Quote → Repair → Complete → Invoice → Get Paid
           </p>
