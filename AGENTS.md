@@ -65,9 +65,11 @@ Talk to the backend through the **published contract**, never hand-written types
 ### Where things live (sibling repos under `~/Desktop/crossub/`)
 
 - **Backend (NestJS):** `crossub_web/apps/api` — the contractor facade is `/api/v1/contractor/*`.
-- **Contract source:** `crossub_web/packages/api-contract` — wired into this session via
-  `.claude/settings.json` → `additionalDirectories`, so the live contract types are in
-  context without opening the whole backend or the other apps.
+- **Contract:** the published `@crossub-thongz/api-contract` package (GitHub Packages), generated in
+  `crossub_web/packages/api-contract`. There is no copy in this repo since 24 Nov 2026.
+  To take a newer contract: publish it from `crossub_web`, raise the version in
+  `apps/maintenance/package.json`, run `pnpm install`, commit `package.json` and `pnpm-lock.yaml`.
+  Never copy contract files into this repo.
 
 ### Auth & data flow
 
